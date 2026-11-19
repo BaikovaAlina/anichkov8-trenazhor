@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Аничков лицей · 8 класс · Тренажёр: классные и домашние работы</title>
+  <link rel="stylesheet" href="css/design-tokens.css">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📐</text></svg>">
+</head>
+<body data-page="index">
+
+  <div class="container">
+    <!-- Верхняя панель -->
+    <header class="site-header">
+      <div class="top-bar">
+        <div>Аничков лицей · вступительные в 8 класс · Алгебра + Геометрия</div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <a href="stats.html" class="stats-link" title="Статистика">📊 <span class="stats-link-text">Статистика</span></a>
+          <button class="btn-settings" onclick="openTelegramSettingsModal()">⚙️ Настройки Telegram</button>
+        </div>
+      </div>
+
+      <h1 class="main-title">📐 Аничков лицей · 8 класс · Уроки 1–30 (12 модулей)</h1>
+      <p class="subtitle">Интерактивный задачник-тренажёр: теория, классные работы и автоматическая проверка ДЗ с отправкой в Telegram</p>
+    </header>
+
+    <!-- Баннер быстрого запуска тренажёра -->
+    <section class="hero-banner">
+      <div>
+        <h3>✏️ Интерактивный тренажёр · Аничков лицей, 8 класс</h3>
+        <p>Задачи в формате вступительных 2006–2026: вычисления, дроби, уравнения, проценты, текстовые задачи, геометрия и логика. Мгновенная проверка и отправка результата учителю.</p>
+      </div>
+      <div>
+        <a href="trainer.html?variant=K-1" class="btn-hero">Открыть тренажёр ▶</a>
+      </div>
+    </section>
+
+    <!-- Панель фильтров по уровням -->
+    <div class="filter-bar">
+      <button class="filter-btn active" onclick="filterLessons('all', this)">Все уроки (1–30)</button>
+      <button class="filter-btn" onclick="filterLessons('base', this)">Базовый уровень</button>
+      <button class="filter-btn" onclick="filterLessons('adv', this)">Углублённый (Михлин)</button>
+      <button class="filter-btn" onclick="filterLessons('oly', this)">Олимпиадные темы & Логика</button>
+    </div>
+
+    <!-- Список модулей и уроков (рендерится из data/lessons.json → js/tasks.js) -->
+    <main id="modulesContainer"></main>
+
+    <footer style="margin-top: 40px; text-align: center; font-size: 14px; color: #7f6e52; border-top: 1px dashed #d8c9a8; padding-top: 20px;">
+      <p>✏️ Каждая работа мгновенно проверяет ответы (верно — зелёным, ошибка — красным).</p>
+      <p>В конце работы результат отправляется учителю в Telegram нажатием кнопки «Отправить результат в Telegram ✈️».</p>
+      <p style="margin-top:8px;">Подготовка к вступительным в 8 класс Аничкова лицея · по материалам экзаменов 2006–2026 и пособия Л. С. Михлина · GitHub Pages</p>
+    </footer>
+  </div>
+
+  <!-- Модальное окно: Памятка / Теория -->
+  <div class="modal-overlay" id="theoryModal" onclick="if(event.target === this) closeTheoryModal()">
+    <div class="modal-box">
+      <button class="modal-close" onclick="closeTheoryModal()">×</button>
+      <div id="theoryContent"></div>
+    </div>
+  </div>
+
+  <!-- Модальное окно: Настройки Telegram -->
+  <div class="modal-overlay" id="settingsModal" onclick="if(event.target === this) closeTelegramSettingsModal()">
+    <div class="modal-box">
+      <button class="modal-close" onclick="closeTelegramSettingsModal()">×</button>
+      <h3 class="modal-title">⚙️ Настройки Telegram для учителя</h3>
+
+      <p style="font-size:15px; margin-bottom:14px; color:#4a3f2b;">
+        Результаты отправляются через бот
+        <a href="https://t.me/ZVEROKZVEROKBOT" target="_blank" rel="noopener" style="color:var(--chalk); font-weight:bold;">@ZVEROKZVEROKBOT</a>.
+      </p>
+
+      <div style="background:#fff; border:1px solid #d4c4a4; padding:14px; border-radius:6px; margin-bottom:16px; font-size:14px;">
+        <b>Как учителю получать отчёты учеников:</b><br>
+        1. Откройте Telegram и напишите боту <a href="https://t.me/ZVEROKZVEROKBOT" target="_blank" rel="noopener" style="color:var(--chalk); font-weight:bold;">@ZVEROKZVEROKBOT</a> команду <code>/start</code>.<br>
+        2. Узнайте свой числовой <b>Chat ID</b> (например, написав боту <code>@userinfobot</code>).<br>
+        3. Введите ваш <b>Chat ID</b> в поле ниже и нажмите «Проверить связь 🔔».
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <label for="settingChatId" style="font-weight:bold; font-size:15px;">Ваш Telegram Chat ID (или ID группы):</label>
+        <input type="text" id="settingChatId" class="student-name-input" placeholder="Например: 123456789" style="font-size:16px;">
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;">
+          <button class="btn-hero" onclick="saveTelegramSettings()" style="padding:8px 18px; font-size:14.5px;">Сохранить в браузере 💾</button>
+          <button class="btn-send-tg" onclick="testTelegramPing()" style="padding:8px 18px; font-size:14.5px;">Проверить связь 🔔</button>
+        </div>
+        <div class="send-status-msg" id="settingStatusMsg"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/tasks.js"></script>
+  <script src="js/checker.js"></script>
+  <script src="js/telegram.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

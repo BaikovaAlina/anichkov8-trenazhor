@@ -1,0 +1,56 @@
+/* ============================================================
+ * DESIGN-TOKENS.CSS — токены дизайна, перенесённые 1:1 из эталона
+ * https://github.com/BaikovaAlina/math6-trenazhor (style.css, :root)
+ * Стиль: «тетрадь в клетку», красные поля, меловая доска, стикеры.
+ * ВНИМАНИЕ: значения не менять — визуальная система должна совпадать с эталоном.
+ * ============================================================ */
+
+:root {
+  /* ---------- Палитра (исходные переменные эталона) ---------- */
+  --paper: #FBF7EC;        /* фон: тёплая тетрадная бумага */
+  --grid: #C9D9E8;         /* линии тетрадной клетки (шаг 28px) */
+  --red: #E2574C;          /* красные поля, акцент «домашняя», бейджи номеров */
+  --red-hover: #cf3b30;
+  --pencil: #2B2B2B;       /* основной текст (грифель) */
+  --chalk: #2E5D4B;        /* меловая доска: основной акцент, кнопки действия */
+  --chalk-dark: #1b3d30;   /* заголовки */
+  --chalk-light: #43836b;  /* hover основных кнопок */
+  --sticky: #FFF4B8;       /* жёлтый стикер (подсказки, настройки, отправка) */
+  --sticky-border: #E8DC96;
+  --green: #1F7A4D;        /* состояние correct */
+  --green-light: #e6f7ee;
+  --bad: #C2402F;          /* состояние incorrect */
+  --bad-light: #fbeae8;
+  --border-card: #d8c9a8;  /* границы карточек и кнопок */
+
+  /* ---------- Типографика ---------- */
+  --font-hand: "Segoe Print", "Comic Sans MS", "Chalkboard SE", "Segoe UI", cursive, sans-serif;
+  --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* ---------- Задокументированные значения эталона (справочно) ----------
+   * Цвета текста второго плана:  #7c6a4b (top-bar), #6a583d (subtitle), #8c7857 (meta),
+   *                              #705e41 (task-sub), #8a7a5c (crumb), #726042 (counter)
+   * Бейджи уровней:  base #e3f2fd/#1976d2 · adv #f3e5f5/#7b1fa2 · oly #fff3e0/#e65100
+   * Кнопки уроков:   К #edf6f2/#bcdbc9 · Д #fdf1f0/#f5c4c0 · теория = sticky
+   * Telegram:        #2AABEE (hover #229ed9)
+   * Размеры шрифта:  h1 clamp(24px,4vw,36px) · task-heading clamp(20px,3.2vw,26px)
+   *                  module 20px · card h4 16px · task-row 17px · input 18px · body lh 1.6
+   */
+  --radius-xs: 3px;        /* .slide */
+  --radius-sm: 4px;        /* .btn-lesson, .task-row, .hint-box */
+  --radius-md: 6px;        /* .lesson-card, кнопки, поля */
+  --radius-lg: 8px;        /* .hero-banner, .modal-box, .send-box */
+  --radius-xl: 12px;       /* .score-box, .badge */
+  --radius-pill: 20px;     /* .filter-btn, .grade-badge */
+
+  --shadow-card: 4px 4px 0 rgba(0,0,0,0.05);
+  --shadow-card-hover: 5px 6px 0 rgba(0,0,0,0.09);
+  --shadow-hero: 6px 6px 0 rgba(46, 93, 75, 0.15);
+  --shadow-btn: 3px 3px 0 rgba(0,0,0,0.15);
+  --shadow-slide: 8px 10px 0 rgba(0,0,0,.08), 0 24px 50px rgba(90,70,30,.15);
+
+  --container-width: 980px;   /* .container */
+  --footer-width: 960px;      /* .footer-content */
+  --grid-step: 28px;          /* клетка тетради */
+  /* Брейкпоинт мобильной вёрстки: max-width 640px */
+}
