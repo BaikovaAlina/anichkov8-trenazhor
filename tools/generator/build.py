@@ -5,6 +5,7 @@ import json, sys, subprocess, re, collections
 import pathlib; HERE = pathlib.Path(__file__).resolve().parent; sys.path.insert(0, str(HERE))
 from dsl import LESSONS, MODULES, TASKS, MOCKS, verify
 import content_a, content_b, content_c, content_d, content_e, content_f  # noqa
+import content_g  # noqa  (банк сайта anichkov-liceum-trenazhor)
 from srcs import DEFAULT, L30
 from texify import tex, leftovers
 REPO = str(HERE.parent.parent)
@@ -41,6 +42,9 @@ for key, v in TASKS.items():
         new_tasks[key] = v
 TASKS.clear(); TASKS.update(new_tasks)
 moved = {k: v for k, v in remap.items() if k != v}
+g = content_g.STATS
+print(f"банк-2: перенесено {g['rows']}, исключено {len(g['dropped'])}, в выбор {g['choice']}, списков {g['lists']}")
+print("банк-2 по урокам:", dict(sorted(g["per_lesson"].items())))
 print("перенумерация уроков:", ", ".join(f"{k}→{v}" for k, v in moved.items()) or "нет")
 
 # ---- 3. Единая разметка дробей ----
