@@ -1,5 +1,7 @@
 """Мини-DSL для описания банка задач. Генерирует структуру, совместимую с эталоном
-(questions → tasks → parts/inputs), плюс новые типы choice/point и поле пояснения e."""
+(questions → tasks → parts/inputs), плюс новые типы choice/point и поле пояснения e.
+Подсказок (hints), источников (src) и бейджей уровня в данных нет: на слайде только условие,
+поля ответа и пояснение e, которое показывается после проверки."""
 from fractions import Fraction as F
 import re
 
@@ -12,10 +14,8 @@ def fr(num, den):
     return "\\frac{" + num + "}{" + den + "}"
 
 
-def _meta(row, src, tp):
-    """src — источник/обоснование задачи, tp — тема для аудита (если отличается от темы урока)."""
-    if src:
-        row["src"] = src
+def _meta(row, tp):
+    """tp — тема для аудита (если отличается от темы урока)."""
     if tp:
         row["tp"] = tp
     return row
@@ -33,7 +33,7 @@ def _num(s):
     return F(s)
 
 
-def R(label, ans, e="", pre="Ответ:", type="", chk=None, fig=None, post=None, src=None, tp=None):
+def R(label, ans, e="", pre="Ответ:", type="", chk=None, fig=None, post=None, tp=None):
     """Строка с одним полем ввода."""
     parts = [pre, {"_input": 0}] if pre else [{"_input": 0}]
     if post:
@@ -43,10 +43,10 @@ def R(label, ans, e="", pre="Ответ:", type="", chk=None, fig=None, post=Non
         row["fig"] = fig
     if chk is not None:
         CHECKS.append((label, ans, chk))
-    return _meta(row, src, tp)
+    return _meta(row, tp)
 
 
-def M(label, parts, answers, e="", types=None, fig=None, chks=None, src=None, tp=None):
+def M(label, parts, answers, e="", types=None, fig=None, chks=None, tp=None):
     """Строка с несколькими полями: parts — список строк и None (места полей)."""
     out, k = [], 0
     for p in parts:
@@ -65,26 +65,26 @@ def M(label, parts, answers, e="", types=None, fig=None, chks=None, src=None, tp
         for a, c in zip(answers, chks):
             if c is not None:
                 CHECKS.append((label, a, c))
-    return _meta(row, src, tp)
+    return _meta(row, tp)
 
 
-def C(label, options, ans, e="", pre=None, src=None, tp=None):
+def C(label, options, ans, e="", pre=None, tp=None):
     """Выбор одного варианта."""
     assert ans in options, (label, ans)
     parts = ([pre] if pre else []) + [{"_input": 0}]
     return _meta({"label": label, "parts": parts,
-            "inputs": [{"a": ans, "type": "choice", "options": options}], "e": e}, src, tp)
+            "inputs": [{"a": ans, "type": "choice", "options": options}], "e": e}, tp)
 
 
-def P(label, grid, ans, e="", src=None, tp=None):
+def P(label, grid, ans, e="", tp=None):
     """Перетаскивание точки по клетчатому чертежу (ответ — узел сетки)."""
     return _meta({"label": label, "parts": [{"_input": 0}],
-            "inputs": [{"a": ans, "type": "point", "grid": grid}], "e": e}, src, tp)
+            "inputs": [{"a": ans, "type": "point", "grid": grid}], "e": e}, tp)
 
 
-def Q(title, sub, hints, rows, crumb=None):
-    return {"title": title, "sub": sub, "hints": hints if isinstance(hints, list) else [hints],
-            "rows": rows, "crumb": crumb}
+def Q(title, sub, rows, crumb=None):
+    """Вопрос (слайд): заголовок, подзаголовок (только формат ответа или ""), строки-задачи."""
+    return {"title": title, "sub": sub, "rows": rows, "crumb": crumb}
 
 
 def _mkq(num, kind, qi, q):
@@ -95,15 +95,16 @@ def _mkq(num, kind, qi, q):
             inp["w"] = 1
     return {"num": str(qi), "title": q["title"], "sub": q["sub"],
             "crumb": q["crumb"] or (f"Урок {num} · {'Классная' if kind == 'K' else 'ДЗ'}" if kind in "KD" else ""),
-            "hints": q["hints"], "tasks": list(q["rows"])}
+            "tasks": list(q["rows"])}
 
 
-def lesson(num, module, level, badge, title, short, theory, K, D):
-    LESSONS.append({"num": num, "module": module, "level": level, "badge": badge,
+def lesson(num, module, level, title, short, theory, K, D):
+    """level (base/adv/oly) нужен только фильтру на главной; бейджа уровня нет."""
+    LESSONS.append({"num": num, "module": module, "level": level,
                     "title": title, "short": short, "theory": theory})
     for kind, (topic, qs) in (("K", K), ("D", D)):
         work = "Классная работа" if kind == "K" else "Домашнее задание"
-        TASKS[f"{kind}-{num}"] = {"title": f"Урок {num} · {work}", "topic": topic, "badge": badge,
+        TASKS[f"{kind}-{num}"] = {"title": f"Урок {num} · {work}", "topic": topic,
                                  "questions": [_mkq(num, kind, qi, q) for qi, q in enumerate(qs, 1)]}
 
 
@@ -130,7 +131,7 @@ def replace_row(num, kind, qi, ri, row):
 
 def mock(num, title, desc, topics, qs, minutes=90):
     """Комплексный пробник в формате первого тура Аничкова лицея (вариант P-num)."""
-    TASKS[f"P-{num}"] = {"title": f"Пробник {num}", "topic": title, "badge": f"Математика + логика · {minutes} мин",
+    TASKS[f"P-{num}"] = {"title": f"Пробник {num}", "topic": title,
                          "mock": True, "minutes": minutes,
                          "questions": [_mkq(num, "P", qi, q) for qi, q in enumerate(qs, 1)]}
     MOCKS.append({"num": num, "title": title, "desc": desc, "topics": topics, "minutes": minutes})

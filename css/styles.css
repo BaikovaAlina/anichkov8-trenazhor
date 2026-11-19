@@ -51,6 +51,12 @@ body {
   color: #7c6a4b;
 }
 
+/* Правая группа шапки: держит прежнюю высоту строки (28px), чтобы после удаления
+   кнопки настроек Telegram заголовок и сетка не сдвинулись ни на 1280, ни на 375 px */
+.top-bar > div:last-child {
+  min-height: 28px;
+}
+
 .top-bar a {
   color: var(--chalk);
   text-decoration: none;
@@ -62,23 +68,6 @@ body {
 .top-bar a:hover {
   color: var(--red);
   border-color: var(--red);
-}
-
-.btn-settings {
-  background: var(--sticky);
-  border: 1px solid var(--sticky-border);
-  border-radius: 6px;
-  padding: 5px 12px;
-  font-family: var(--font-hand);
-  font-size: 13.5px;
-  cursor: pointer;
-  box-shadow: 2px 2px 0 rgba(0,0,0,0.06);
-  transition: transform 0.15s, background-color 0.2s;
-}
-
-.btn-settings:hover {
-  background: #fae89b;
-  transform: translateY(-1px);
 }
 
 .main-title {
@@ -250,8 +239,6 @@ body {
   font-weight: bold;
 }
 
-.badge-base { background: #e3f2fd; color: #1976d2; }
-.badge-adv { background: #f3e5f5; color: #7b1fa2; }
 .badge-oly { background: #fff3e0; color: #e65100; }
 
 .lesson-card h4 {
@@ -458,7 +445,7 @@ body {
   75% { transform: translateX(4px); }
 }
 
-/* Подсказки к заданию */
+/* Жёлтая плашка-сообщение (пустое состояние статистики) */
 .hint-box {
   background: var(--sticky);
   border-left: 4px solid #e2cb5a;
@@ -1055,14 +1042,6 @@ body {
 /* Ссылка на статистику: на телефоне — только иконка, чтобы шапка оставалась в одну строку как в эталоне */
 @media (max-width: 640px) {
   .stats-link-text { display: none; }
-}
-
-/* Источник / обоснование задачи (Аничков — год или тип; Михлин) */
-.task-src {
-  font-size: 12.5px;
-  color: #8a7a5a;
-  margin: -4px 0 8px;
-  font-style: italic;
 }
 
 /* Пробники: описание на карточке, таймер, зафиксированные ответы */

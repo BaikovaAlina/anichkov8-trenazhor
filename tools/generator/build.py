@@ -1,26 +1,14 @@
 """Генератор банка: content_*.py → data/lessons.json + data/tasks.json → js/tasks.js.
-Шаги: самопроверка ответов → обоснование src по умолчанию → перенумерация уроков (1..N подряд,
-т. к. роутинг и «◀ ▶» работают с целыми номерами) → единая разметка дробей \\frac{}{} → экспорт."""
+Шаги: самопроверка ответов → перенумерация уроков (1..N подряд, т. к. роутинг и «◀ ▶» работают
+с целыми номерами) → единая разметка дробей \\frac{}{} → контроль: в данных нет подсказок/источников → экспорт."""
 import json, sys, subprocess, re, collections
 import pathlib; HERE = pathlib.Path(__file__).resolve().parent; sys.path.insert(0, str(HERE))
 from dsl import LESSONS, MODULES, TASKS, MOCKS, verify
 import content_a, content_b, content_c, content_d, content_e, content_f  # noqa
 import content_g  # noqa  (банк сайта anichkov-liceum-trenazhor)
-from srcs import DEFAULT, L30
 from texify import tex, leftovers
 REPO = str(HERE.parent.parent)
 bad = verify()
-
-# ---- 1. Обоснование для задач исходного банка ----
-for key, v in TASKS.items():
-    kind, num = key.split("-", 1)
-    if kind == "P":
-        continue
-    num = float(num); num = int(num) if num.is_integer() else num
-    for q in v["questions"]:
-        for t in q["tasks"]:
-            if "src" not in t:
-                t["src"] = L30[int(q["num"])] if num == 30 else DEFAULT[num]
 
 # ---- 2. Перенумерация уроков ----
 LESSONS.sort(key=lambda l: l["num"])
@@ -43,7 +31,8 @@ for key, v in TASKS.items():
 TASKS.clear(); TASKS.update(new_tasks)
 moved = {k: v for k, v in remap.items() if k != v}
 g = content_g.STATS
-print(f"банк-2: перенесено {g['rows']}, исключено {len(g['dropped'])}, в выбор {g['choice']}, списков {g['lists']}")
+print(f"банк-2: перенесено {g['rows']}, исключено {len(g['dropped'])}, в выбор {g['choice']}, списков {g['lists']}, "
+      f"подписей-подсказок → «Ответ:» {g['neutral']}")
 print("банк-2 по урокам:", dict(sorted(g["per_lesson"].items())))
 print("перенумерация уроков:", ", ".join(f"{k}→{v}" for k, v in moved.items()) or "нет")
 
@@ -52,7 +41,6 @@ for v in TASKS.values():
     for q in v["questions"]:
         for f in ("title", "sub", "crumb"):
             q[f] = tex(q[f])
-        q["hints"] = [tex(h) for h in q["hints"]]
         for t in q["tasks"]:
             t["label"] = tex(t["label"])
             t["e"] = tex(t.get("e", ""))
@@ -73,7 +61,6 @@ def strings():
     for key, v in TASKS.items():
         for q in v["questions"]:
             yield key, q["title"]; yield key, q["sub"]; yield key, q["crumb"] or ""
-            yield from ((key, h) for h in q["hints"])
             for t in q["tasks"]:
                 yield key, t["label"]; yield key, t["e"]
                 yield from ((key, p) for p in t["parts"] if isinstance(p, str))
@@ -94,7 +81,17 @@ for k, lo in left[:40]:
 
 # ---- 5. Аудит по темам ----
 rows = [(k, t) for k, v in TASKS.items() for q in v["questions"] for t in q["tasks"]]
-assert all(t.get("src") for _, t in rows), "есть задачи без src"
+# Подсказки, источники и бейджи уровня удалены из самих данных (а не скрыты CSS).
+FORBIDDEN_Q, FORBIDDEN_T = {"hints"}, {"src"}
+assert not any(FORBIDDEN_Q & q.keys() for v in TASKS.values() for q in v["questions"]), "в вопросах остались hints"
+assert not any(FORBIDDEN_T & t.keys() for _, t in rows), "в задачах остался src"
+assert not any("badge" in v for v in TASKS.values()) and not any("badge" in l for l in LESSONS), "остался badge"
+assert not any("source" in l["theory"] for l in LESSONS), "в теории остался source"
+SRC_RE = re.compile(r"\((?:вступительные\s+)?(?:19|20)\d\d(?:,\s*(?:19|20)\d\d)*\)|Михлин|Макарычев|Атанасян|ФМШ|пособи|учебник|§")
+src_left = [(k, s) for k, s in strings() if s and SRC_RE.search(s)]
+src_left += [(k, s) for k, v in TASKS.items() for s in (v["title"], v["topic"]) if SRC_RE.search(s)]
+src_left += [(f"L{l['num']}", s) for l in LESSONS for s in (l["title"], l["short"]) if SRC_RE.search(s)]
+assert not src_left, f"остались упоминания источников: {src_left[:5]}"
 per_lesson = collections.Counter()
 for k, t in rows:
     if not k.startswith("P-"):

@@ -3,7 +3,7 @@
  * ============================================================
  * Схема эталона: fetch → https://api.telegram.org/bot<TOKEN>/sendMessage,
  * parse_mode: HTML. Токен/Chat ID берутся из config.js (подставлены из GitHub
- * Secrets при деплое) или из localStorage (меню «⚙️ Настройки Telegram»).
+ * Secrets при деплое). Отправка идёт в фоне: никаких настроек в интерфейсе нет.
  * ============================================================ */
 
 "use strict";
@@ -107,8 +107,7 @@ function showStatusMsg(elId, type, text) {
  */
 async function sendReportsWithUI(messages, statusElId) {
   if (!getTelegramChatId()) {
-    showStatusMsg(statusElId, "err", "⚠️ Chat ID учителя не указан! Нажмите «⚙️ Настройки Telegram» вверху страницы и введите ваш Chat ID.");
-    openTelegramSettingsModal();
+    showStatusMsg(statusElId, "err", "⚠️ Отправка в Telegram сейчас недоступна. Сообщите учителю результат на экране.");
     return false;
   }
   if (!getTelegramBotToken()) {
@@ -125,51 +124,4 @@ async function sendReportsWithUI(messages, statusElId) {
   }
   showStatusMsg(statusElId, "ok", "✅ Результат успешно отправлен учителю в Telegram!");
   return true;
-}
-
-/* ---------------- Модальное окно «⚙️ Настройки Telegram» (как в эталоне) ---------------- */
-
-function openTelegramSettingsModal() {
-  const modal = document.getElementById("settingsModal");
-  if (!modal) return;
-  const input = document.getElementById("settingChatId");
-  if (input) input.value = getTelegramChatId();
-  modal.classList.add("open");
-}
-
-function closeTelegramSettingsModal() {
-  const modal = document.getElementById("settingsModal");
-  if (modal) modal.classList.remove("open");
-}
-
-/** Сохранение Chat ID в браузере. */
-function saveTelegramSettings() {
-  const input = document.getElementById("settingChatId");
-  if (!input) return;
-  setTelegramChatId(input.value.trim());
-  showStatusMsg("settingStatusMsg", "ok", "✅ Chat ID успешно сохранён в браузере!");
-  setTimeout(closeTelegramSettingsModal, 1200);
-}
-
-/** Тестовая отправка сообщения из настроек. */
-async function testTelegramPing() {
-  const input = document.getElementById("settingChatId");
-  const chatId = input ? input.value.trim() : "";
-  if (!chatId) {
-    showStatusMsg("settingStatusMsg", "err", "⚠️ Сначала введите Chat ID!");
-    return;
-  }
-  if (!getTelegramBotToken()) {
-    showStatusMsg("settingStatusMsg", "err", "⚠️ Токен Telegram-бота не найден!");
-    return;
-  }
-  showStatusMsg("settingStatusMsg", "wait", "Отправляю тестовый сигнал боту... ⏳");
-  const text = `🔔 <b>Тестовое подключение успешно!</b>\n\nТренажёр «Аничков лицей · 8 класс» подключён к Telegram-боту @${CONFIG.telegram.botUsername}. Отчёты учеников будут приходить в этот чат! 🎉`;
-  const res = await sendToTelegram(text, chatId);
-  if (res.ok) {
-    setTelegramChatId(chatId);
-    showStatusMsg("settingStatusMsg", "ok", "🎉 Сообщение доставлено в Telegram! Связь установлена.");
-  } else {
-    showStatusMsg("settingStatusMsg", "err", `❌ Ошибка: ${res.error}. Убедитесь, что вы нажали /start боту @${CONFIG.telegram.botUsername}.`);
-  }
 }

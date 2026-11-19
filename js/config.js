@@ -7,8 +7,8 @@
  *   - TELEGRAM_BOT_TOKEN
  *   - TELEGRAM_CHAT_ID
  *
- * Поддерживается переопределение Chat ID (и токена — для локальной отладки)
- * через меню «⚙️ Настройки Telegram» (сохраняется в localStorage браузера).
+ * Для локальной отладки Chat ID и токен можно переопределить ключами localStorage
+ * anichkov8_telegram_chat_id / anichkov8_telegram_bot_token (в интерфейсе настроек нет).
  * ============================================================ */
 
 const CONFIG = {
@@ -60,16 +60,4 @@ function getTelegramChatId() {
     return CONFIG.telegram.chatId.trim();
   }
   return "";
-}
-
-/** Сохраняет Chat ID в localStorage (пустое значение — удаляет). @param {string} chatId */
-function setTelegramChatId(chatId) {
-  if (chatId) localStorage.setItem(CONFIG.storagePrefix + "telegram_chat_id", chatId.trim());
-  else localStorage.removeItem(CONFIG.storagePrefix + "telegram_chat_id");
-}
-
-/** Сохраняет токен в localStorage (только для локального тестирования). @param {string} token */
-function setTelegramBotToken(token) {
-  if (token) localStorage.setItem(CONFIG.storagePrefix + "telegram_bot_token", token.trim());
-  else localStorage.removeItem(CONFIG.storagePrefix + "telegram_bot_token");
 }

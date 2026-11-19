@@ -35,11 +35,14 @@ for m in lessons.get("mocks", []):
     v = tasks.get(f"P-{m['num']}")
     if not v or not v.get("mock") or not v.get("minutes"):
         errors.append(f"пробник П-{m['num']}: нет варианта P-{m['num']} с mock/minutes")
+# Подсказки и источники в банк не входят (на слайде — только условие, поля и пояснение после проверки)
 for key, v in tasks.items():
     for q in v["questions"]:
+        if "hints" in q:
+            errors.append(f"{key} зад.{q['num']}: в данных осталась подсказка hints")
         for t in q["tasks"]:
-            if not t.get("src"):
-                errors.append(f"{key} зад.{q['num']}: нет обоснования src")
+            if "src" in t:
+                errors.append(f"{key} зад.{q['num']}: в данных остался источник src")
 if errors:
     print("ОШИБКИ В БАНКЕ ЗАДАЧ:\n  " + "\n  ".join(errors))
     sys.exit(1)

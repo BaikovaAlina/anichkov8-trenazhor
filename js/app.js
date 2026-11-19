@@ -214,8 +214,6 @@ const MockStats = {
  * ГЛАВНАЯ: СПИСОК МОДУЛЕЙ И УРОКОВ
  * ============================================================ */
 
-const BADGE_CLASS = { base: "badge-base", adv: "badge-adv", oly: "badge-oly" };
-
 /** Рендер модулей на главной странице. */
 function renderIndex() {
   const cont = $("#modulesContainer");
@@ -235,7 +233,6 @@ function renderIndex() {
             <div class="lesson-top">
               <div class="lesson-meta">
                 <span>Урок ${l.num} · ${esc(mod.section)}</span>
-                <span class="badge ${BADGE_CLASS[l.level]}">${esc(l.badge)}</span>
               </div>
               <h4><a href="lesson.html#/lesson/${l.num}">${esc(l.title)}</a></h4>
             </div>
@@ -344,7 +341,6 @@ function renderLessonPage() {
         <div class="lesson-top">
           <div class="lesson-meta">
             <span>${variantLabel(vKey)} · ${countTasks(vKey)} заданий</span>
-            <span class="badge ${BADGE_CLASS[lesson.level]}">${esc(lesson.badge)}</span>
           </div>
           <h4>${isK ? "✏️ Классная работа" : "🏠 Домашнее задание"}</h4>
           <p style="font-size:14px; color:#4f422e; margin-top:6px;">${esc(v.topic)}</p>
@@ -363,8 +359,7 @@ function renderLessonPage() {
   let tHtml = `
     <div class="margin-line"></div>
     <div class="crumb">Урок ${lesson.num} · Теория и памятка</div>
-    <h2 class="task-heading"><span class="task-num-badge">📖</span>${esc(lesson.title)}</h2>
-    <div class="task-sub">— ${esc(th.source)}</div>`;
+    <h2 class="task-heading"><span class="task-num-badge">📖</span>${esc(lesson.title)}</h2>`;
   th.rules.forEach((r) => { tHtml += `<div class="theory-rule-item">📌 ${formatMath(r)}</div>`; });
   if (th.sample) tHtml += `<div class="theory-sample"><b>💡 Пример решения:</b><br>${formatMath(th.sample)}</div>`;
   const theorySlide = $("#lessonTheory");
@@ -761,7 +756,6 @@ function loadVariant(vKey) {
     q.tasks.forEach((t, tIdx) => {
       html += `<div class="task-row" data-explain="${esc(t.e || "")}">`;
       if (t.label) html += `<div class="task-text">${formatMath(t.label)}</div>`;
-      if (t.src) html += `<div class="task-src">📎 ${esc(t.src)}</div>`;
       if (t.fig) html += `<div class="geo-board geo-static">${renderGeoSvg(t.fig, "")}</div>`;
       html += `<div class="task-expression">`;
       t.parts.forEach((part) => {
@@ -774,13 +768,6 @@ function loadVariant(vKey) {
       html += `</div><div class="explain-box"></div></div>`;
     });
 
-    if (q.hints && q.hints.length) {
-      html += `
-        <div class="hint-box">
-          <span>💡</span>
-          <div>${q.hints.map(formatMath).join("<br>")}</div>
-        </div>`;
-    }
     html += `</div>`;
     slide.innerHTML = html;
     slidesContainer.appendChild(slide);
@@ -1193,9 +1180,6 @@ function openTheoryModal(lessonNum) {
   const data = lesson.theory;
   let html = `
     <h3 class="modal-title">📖 Урок ${lesson.num}. ${esc(lesson.title)}</h3>
-    <div style="font-size:13.5px; color:#8c7857; margin-bottom:12px;">
-      Источник: <b>${esc(data.source)}</b> · <span class="badge ${BADGE_CLASS[lesson.level]}">${esc(lesson.badge)}</span>
-    </div>
     <div style="margin-bottom:14px;">`;
   data.rules.forEach((rule) => { html += `<div class="theory-rule-item">📌 ${formatMath(rule)}</div>`; });
   html += `</div>`;
@@ -1225,6 +1209,6 @@ document.addEventListener("DOMContentLoaded", () => {
   if (page === "stats") renderStatsPage();
 
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") { closeTheoryModal(); closeTelegramSettingsModal(); }
+    if (e.key === "Escape") closeTheoryModal();
   });
 });

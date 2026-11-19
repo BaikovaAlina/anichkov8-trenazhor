@@ -57,10 +57,43 @@ LD.lessons.forEach((l, i) => {
   ok(n >= 15, `урок ${l.num}: задач ${n} < 15`);
 });
 
-// ---- 5. Обоснование (src) у каждой задачи ----
-for (const [key, v] of Object.entries(TASKS))
-  for (const q of v.questions) q.tasks.forEach((t, ri) =>
-    ok(typeof t.src === "string" && /Аничков|Михлин/.test(t.src), `${key} №${q.num}.${ri + 1}: нет обоснования src`));
+// ---- 5. Нет подсказок, источников и бейджей уровня — ни в данных, ни в разметке ----
+const SRC_RE = /\((?:вступительные\s+)?(?:19|20)\d\d(?:,\s*(?:19|20)\d\d)*\)|Михлин|Макарычев|Атанасян|ФМШ|пособи|учебник|§|в стиле Аничкова/;
+for (const [key, v] of Object.entries(TASKS)) {
+  ok(!("badge" in v), `${key}: остался badge`);
+  ok(!SRC_RE.test(v.title + v.topic), `${key}: источник в названии`);
+  for (const q of v.questions) {
+    ok(!("hints" in q), `${key} №${q.num}: осталось поле hints`);
+    ok(!SRC_RE.test(q.title + q.sub + q.crumb), `${key} №${q.num}: источник в заголовке`);
+    // подзаголовок — только формат ответа / способ ввода
+    ok(!q.sub || /^— (корни через|ответ|перетащите|выберите|клетка|сторона клетки|90 минут|чётная или нечётная)/.test(q.sub),
+      `${key} №${q.num}: подзаголовок-подсказка «${q.sub}»`);
+    q.tasks.forEach((t, ri) => {
+      const id = `${key} №${q.num}.${ri + 1}`;
+      ok(!("src" in t), `${id}: осталось поле src`);
+      ok(!SRC_RE.test(t.label + " " + t.e), `${id}: источник в условии/пояснении`);
+      // подпись прямо перед полем ввода не раскрывает ход решения (нет готовых действий «6 · 0,3 =»)
+      t.parts.forEach((p, i) => {
+        if (typeof p === "string" && t.parts[i + 1] && typeof t.parts[i + 1] === "object")
+          ok(!/\d\s*[·:+−×]\s*[\d(]|√\d|√\(|\\frac\{\d+\}\{\d+\}\s*[+−·]|—\s*всего|Получится|Проверьте|Поменяйте/.test(p), `${id}: подпись-подсказка «${p}»`);
+      });
+    });
+  }
+}
+LD.lessons.forEach((l) => {
+  ok(!("badge" in l) && !("source" in l.theory), `урок ${l.num}: остался badge/source`);
+  ok(!SRC_RE.test([l.title, l.short, ...l.theory.rules, l.theory.sample || ""].join(" ")), `урок ${l.num}: источник в теории`);
+});
+(LD.mocks || []).forEach((m) => ok(!SRC_RE.test(m.title + m.desc), `пробник ${m.num}: источник в названии`));
+const appJs = fs.readFileSync(path.join(root, "js/app.js"), "utf8");
+ok(!/hint-box[\s\S]{0,80}q\.hints|task-src|\.source\b|lesson\.badge|l\.badge/.test(appJs), "app.js не рендерит hints/src/source/badge");
+for (const page of ["index.html", "lesson.html", "trainer.html", "stats.html"]) {
+  const html = fs.readFileSync(path.join(root, page), "utf8");
+  ok(!/btn-settings|settingsModal|Настройки Telegram|settingChatId|Михлин/.test(html), `${page}: остались настройки Telegram или источник`);
+}
+const tgJs = fs.readFileSync(path.join(root, "js/telegram.js"), "utf8") + fs.readFileSync(path.join(root, "js/config.js"), "utf8") + appJs;
+ok(!/TelegramSettings|settingsModal|Настройки Telegram/.test(tgJs), "JS не ссылается на удалённое окно настроек");
+ok(!/btn-settings|task-src/.test(fs.readFileSync(path.join(root, "css/styles.css"), "utf8")), "CSS без .btn-settings/.task-src");
 
 // ---- 6. Пробники ----
 const mocks = LD.mocks || [];
