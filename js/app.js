@@ -28,7 +28,7 @@ function esc(s) {
 
 /** Отображаемое имя варианта: K-7 → «К-7», D-7 → «Д-7». @param {string} key */
 function variantLabel(key) {
-  return key.replace(/^K-/, "К-").replace(/^D-/, "Д-");
+  return key.replace(/^K-/, "К-").replace(/^D-/, "Д-").replace(/^P-/, "П-");
 }
 
 /** Поиск урока по номеру. @param {number} num */
@@ -42,50 +42,74 @@ function getModule(num) {
 }
 
 /* ============================================================
- * ФОРМАТИРОВАНИЕ ВЕРТИКАЛЬНЫХ ДРОБЕЙ (из эталона, без изменений)
+ * ФОРМАТИРОВАНИЕ ДРОБЕЙ — ЕДИНЫЙ ФОРМАТ \frac{числитель}{знаменатель}
+ * ============================================================
+ * Все дроби в банке задач записаны явной разметкой \frac{a}{b} (её ставит
+ * tools/generator/texify.py), поэтому знаки и единицы (км/ч) больше не «съезжают»:
+ * эвристики по символу «/» к тексту заданий не применяются.
  * ============================================================ */
 
+/** HTML вертикальной дроби (визуальный стиль эталона: .frac > .num + .den). */
+function fracHtml(num, den) {
+  return `<span class="frac"><span class="num">${num}</span><span class="den">${den}</span></span>`;
+}
+
+/** Читает группу {…} с учётом вложенности. @returns {{body:string,end:number}|null} */
+function readBraceGroup(s, pos) {
+  if (s[pos] !== "{") return null;
+  let depth = 0;
+  for (let j = pos; j < s.length; j++) {
+    if (s[j] === "{") depth++;
+    else if (s[j] === "}" && --depth === 0) return { body: s.slice(pos + 1, j), end: j + 1 };
+  }
+  return null;
+}
+
+/** Рекурсивный рендер \frac{…}{…} (поддерживает вложенные дроби). */
+function renderFracMarkup(s) {
+  let out = "";
+  let i = 0;
+  for (;;) {
+    const k = s.indexOf("\\frac{", i);
+    if (k < 0) return out + s.slice(i);
+    const a = readBraceGroup(s, k + 5);
+    const b = a && readBraceGroup(s, a.end);
+    if (!b) return out + s.slice(i);
+    out += s.slice(i, k) + fracHtml(renderFracMarkup(a.body), renderFracMarkup(b.body));
+    i = b.end;
+  }
+}
+
+/** \frac{a}{b} → «a/b» для простого текста (отчёт в Telegram); составные части — в скобках. */
+function fracPlain(s) {
+  if (!s || typeof s !== "string" || !s.includes("\\frac{")) return s;
+  const wrap = (x) => (/^[\w,.²³⁴⁵⁶⁷⁸⁹⁰¹√]+$/.test(x) ? x : `(${x})`);
+  let out = "";
+  let i = 0;
+  for (;;) {
+    const k = s.indexOf("\\frac{", i);
+    if (k < 0) return out + s.slice(i);
+    const a = readBraceGroup(s, k + 5);
+    const b = a && readBraceGroup(s, a.end);
+    if (!b) return out + s.slice(i);
+    const prev = s.slice(i, k);
+    out += prev + (/\d$/.test(prev) ? " " : "") + wrap(fracPlain(a.body)) + "/" + wrap(fracPlain(b.body));
+    i = b.end;
+  }
+}
+
 /**
- * Превращает «3/4», «2 1/3», «(a+b)/(a-b)» в дроби с горизонтальной чертой.
+ * Превращает разметку \frac{a}{b} в дроби с горизонтальной чертой.
+ * Строки без разметки (ответ ученика, эталонный ответ) — только числовые «3/4», «2 1/3».
  * @param {string} text
  * @returns {string} HTML
  */
 function formatMath(text) {
   if (!text || typeof text !== "string") return text;
-
-  const urls = [];
-  text = text.replace(/https?:\/\/[^\s"'<>]+/g, (m) => {
-    urls.push(m);
-    return `___URL_${urls.length - 1}___`;
-  });
-
-  text = text.replace(
-    /\(([^)]+)\)\s*\/\s*\(([^)]+)\)/g,
-    `<span class="frac"><span class="num">$1</span><span class="den">$2</span></span>`
-  );
-  text = text.replace(
-    /\(([^)]+)\)\s*\/\s*([a-zA-Zа-яА-Я0-9]+)/g,
-    `<span class="frac"><span class="num">$1</span><span class="den">$2</span></span>`
-  );
-  text = text.replace(
-    /(?<![<a-zA-Z0-9\/:\\])([a-zA-Zа-яА-Я0-9]+)\s*\/\s*\(([^)]+)\)/g,
-    `<span class="frac"><span class="num">$1</span><span class="den">$2</span></span>`
-  );
-  text = text.replace(
-    /(?<![<a-zA-Z0-9\/:\\])([-−]?\d+)\s+(\d+)\s*\/\s*(\d+)(?![a-zA-Z0-9\/>])/g,
-    `<span class="mixed-num">$1<span class="frac"><span class="num">$2</span><span class="den">$3</span></span></span>`
-  );
-  text = text.replace(
-    /(?<![<a-zA-Z0-9\/:\\])[-−]\s*([a-zA-Zа-яА-Я0-9]+)\s*\/\s*([a-zA-Zа-яА-Я0-9]+)(?![a-zA-Z0-9\/>])/g,
-    `<span class="neg-frac"><span class="frac"><span class="num">$1</span><span class="den">$2</span></span></span>`
-  );
-  text = text.replace(
-    /(?<![<a-zA-Z0-9\/:\\])([a-zA-Zа-яА-Я0-9]+)\s*\/\s*([a-zA-Zа-яА-Я0-9]+)(?![a-zA-Z0-9\/>])/g,
-    `<span class="frac"><span class="num">$1</span><span class="den">$2</span></span>`
-  );
-
-  text = text.replace(/___URL_(\d+)___/g, (_, i) => urls[i]);
-  return text;
+  if (text.includes("\\frac{")) return renderFracMarkup(text);
+  return text
+    .replace(/(?<![\w\/<.,])([-−]?\d+)\s+(\d+)\/(\d+)(?![\w\/])/g, (m, w, n, d) => w + fracHtml(n, d))
+    .replace(/(?<![\w\/<.,])(\d+(?:[.,]\d+)?)\/(\d+(?:[.,]\d+)?)(?![\w\/])/g, (m, n, d) => fracHtml(n, d));
 }
 
 /* ============================================================
@@ -156,6 +180,36 @@ const Stats = {
   },
 };
 
+/**
+ * Результаты пробников — отдельное хранилище (ключ anichkov8_mocks), не смешивается с уроками.
+ * Формат: { "P-1": { attempts, best, last, history: [{date, totalScore, maxScore, percent, timeSec, studentName}] } }
+ */
+const MockStats = {
+  key: () => CONFIG.storagePrefix + "mocks",
+  /** @returns {Object} */
+  load() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(this.key()) || "{}");
+      return raw && typeof raw === "object" ? raw : {};
+    } catch (e) { return {}; }
+  },
+  /** @param {string} vKey @param {Object} result */
+  record(vKey, result) {
+    const d = this.load();
+    const e = d[vKey] || (d[vKey] = { attempts: 0, best: 0, last: null, history: [] });
+    e.attempts += 1;
+    e.best = Math.max(e.best, result.percent);
+    e.last = result;
+    const { date, totalScore, maxScore, percent, timeSec, studentName, timeUp } = result;
+    e.history.unshift({ date, totalScore, maxScore, percent, timeSec, studentName, timeUp });
+    e.history = e.history.slice(0, 20);
+    localStorage.setItem(this.key(), JSON.stringify(d));
+  },
+  reset() {
+    localStorage.removeItem(this.key());
+  },
+};
+
 /* ============================================================
  * ГЛАВНАЯ: СПИСОК МОДУЛЕЙ И УРОКОВ
  * ============================================================ */
@@ -166,7 +220,7 @@ const BADGE_CLASS = { base: "badge-base", adv: "badge-adv", oly: "badge-oly" };
 function renderIndex() {
   const cont = $("#modulesContainer");
   if (!cont) return;
-  let html = "";
+  let html = renderMocksBlock();
   LESSONS_DATA.modules.forEach((mod) => {
     html += `
       <section class="module-block" data-module="${mod.num}">
@@ -197,6 +251,41 @@ function renderIndex() {
   cont.innerHTML = html;
 }
 
+/** Раздел «Пробники» на главной (те же module-block / lesson-card, что и у уроков). */
+function renderMocksBlock() {
+  const mocks = LESSONS_DATA.mocks || [];
+  if (!mocks.length) return "";
+  const ms = MockStats.load();
+  let html = `
+      <section class="module-block" id="mocks" data-module="mocks">
+        <div class="module-header">
+          <div class="module-num">★</div>
+          <h2 class="module-title">Пробники в формате вступительных Аничкова лицея · 90 минут</h2>
+        </div>
+        <div class="lesson-grid">`;
+  mocks.forEach((m) => {
+    const k = `P-${m.num}`;
+    const e = ms[k];
+    const res = e ? `Лучший результат: ${e.best}% · попыток: ${e.attempts}` : "Ещё не проходился";
+    html += `
+          <div class="lesson-card" data-level="mock">
+            <div class="lesson-top">
+              <div class="lesson-meta">
+                <span>Пробник ${m.num} · ${m.minutes} минут</span>
+                <span class="badge badge-oly">Математика + логика</span>
+              </div>
+              <h4><a href="trainer.html?variant=${k}">${esc(m.title)}</a></h4>
+              <p class="mock-desc">${TASKS[k].questions.length} заданий: ${esc(m.topics.join(", "))}</p>
+              <p class="mock-desc">${res}</p>
+            </div>
+            <div class="lesson-actions">
+              <a href="trainer.html?variant=${k}" class="btn-lesson btn-cw">Начать пробник ▶ ⏱ ${m.minutes} мин</a>
+            </div>
+          </div>`;
+  });
+  return html + `</div></section>`;
+}
+
 /**
  * Фильтрация карточек по уровню (логика эталона).
  * @param {"all"|"base"|"adv"|"oly"} level
@@ -208,7 +297,7 @@ function filterLessons(level, btn) {
   $$(".lesson-card").forEach((card) => {
     const cl = card.dataset.level;
     const show =
-      level === "all" ||
+      level === "all" || cl === "mock" ||
       (level === "base" && cl === "base") ||
       (level === "adv" && (cl === "adv" || cl === "oly")) ||
       (level === "oly" && cl === "oly");
@@ -327,13 +416,89 @@ const appState = {
   startTime: null,
   results: null,
   recorded: false,
+  mock: false,      // режим пробника (вариант P-n): таймер, проверка только в конце
+  finished: false,  // пробник завершён (ответы зафиксированы)
+  timeUp: false,
 };
+
+/**
+ * Таймер обратного отсчёта пробника (отображается в нижней панели рядом со счётчиком слайдов).
+ * По истечении времени пробник завершается автоматически.
+ */
+const MockTimer = {
+  id: null,
+  deadline: 0,
+  el: null,
+  /** @param {number} minutes */
+  start(minutes) {
+    this.stop();
+    this.deadline = Date.now() + minutes * 60000;
+    this.el = $("#mockTimer");
+    if (!this.el) {
+      this.el = document.createElement("span");
+      this.el.id = "mockTimer";
+      this.el.className = "mock-timer";
+      this.el.title = "Осталось времени";
+      const counter = $("#slideCounter");
+      counter.parentNode.insertBefore(this.el, counter.nextSibling);
+    }
+    this.el.style.display = "";
+    this.tick();
+    this.id = setInterval(() => this.tick(), 1000);
+  },
+  stop() {
+    if (this.id) clearInterval(this.id);
+    this.id = null;
+  },
+  hide() {
+    this.stop();
+    const el = $("#mockTimer");
+    if (el) el.style.display = "none";
+  },
+  /** @returns {number} секунд осталось */
+  left() {
+    return Math.max(0, Math.round((this.deadline - Date.now()) / 1000));
+  },
+  tick() {
+    const s = this.left();
+    this.el.textContent = `⏱ ${formatMMSS(s)}`;
+    this.el.classList.toggle("warn", s <= 300);
+    if (s === 0) {
+      this.stop();
+      appState.timeUp = true;
+      finishMock(true);
+    }
+  },
+};
+
+/**
+ * Завершение пробника: фиксирует ответы, проверяет все задания (подсветка + разбор),
+ * переходит к итогам. @param {boolean} auto - завершение по таймеру (без подтверждения)
+ */
+function finishMock(auto) {
+  if (!appState.mock || appState.finished) return;
+  if (!auto && !confirm("Завершить пробник и посмотреть результат? Изменить ответы после этого будет нельзя.")) return;
+  appState.finished = true;
+  MockTimer.stop();
+  appState.slides.slice(0, -1).forEach((sl) => checkSlide(sl));
+  $$("#slidesDeck input.math-input").forEach((i) => { i.readOnly = true; });
+  $$("#slidesDeck .choice-btn").forEach((b) => { b.disabled = true; });
+  $("#slidesDeck").classList.add("mock-finished");
+  goToSlide(appState.slides.length - 1);
+}
 
 /** Заполнение выпадающего списка работ (группы по модулям — как в эталоне). */
 function buildVariantSelect() {
   const sel = $("#variantSelect");
   if (!sel) return;
   let html = "";
+  if ((LESSONS_DATA.mocks || []).length) {
+    html += `<optgroup label="Пробники (90 минут)">`;
+    LESSONS_DATA.mocks.forEach((m) => {
+      html += `<option value="P-${m.num}">Пробник ${m.num} · П-${m.num} — ${esc(m.title)}</option>`;
+    });
+    html += `</optgroup>`;
+  }
   LESSONS_DATA.modules.forEach((mod) => {
     html += `<optgroup label="Модуль ${mod.num}: ${esc(mod.title)}">`;
     LESSONS_DATA.lessons.filter((l) => l.module === mod.num).forEach((l) => {
@@ -348,7 +513,7 @@ function buildVariantSelect() {
 /** Ключ варианта из URL: ?variant=K-1 (эталон) или #/K-1. @returns {string|null} */
 function variantFromUrl() {
   const p = new URLSearchParams(location.search).get("variant");
-  const h = (location.hash.match(/#\/?([KD]-\d+)/) || [])[1];
+  const h = (location.hash.match(/#\/?([KDP]-\d+)/) || [])[1];
   const key = h || p;
   return key && TASKS[key] ? key : null;
 }
@@ -563,6 +728,9 @@ function loadVariant(vKey) {
   appState.startTime = new Date();
   appState.results = null;
   appState.recorded = false;
+  appState.mock = !!data.mock;
+  appState.finished = false;
+  appState.timeUp = false;
 
   const titleEl = $("#trainerTitle");
   if (titleEl) titleEl.textContent = data.title;
@@ -593,6 +761,7 @@ function loadVariant(vKey) {
     q.tasks.forEach((t, tIdx) => {
       html += `<div class="task-row" data-explain="${esc(t.e || "")}">`;
       if (t.label) html += `<div class="task-text">${formatMath(t.label)}</div>`;
+      if (t.src) html += `<div class="task-src">📎 ${esc(t.src)}</div>`;
       if (t.fig) html += `<div class="geo-board geo-static">${renderGeoSvg(t.fig, "")}</div>`;
       html += `<div class="task-expression">`;
       t.parts.forEach((part) => {
@@ -652,7 +821,9 @@ function loadVariant(vKey) {
 
     <div style="display:flex; gap:12px; justify-content:center; margin-top:20px; flex-wrap:wrap;">
       <button class="btn-nav" id="btnRestart">🔄 Пройти заново</button>
-      <a href="lesson.html#/lesson/${vKey.split("-")[1]}" class="btn-nav" style="text-decoration:none;">📖 К уроку</a>
+      ${data.mock
+        ? `<a href="index.html#mocks" class="btn-nav" style="text-decoration:none;">★ К пробникам</a>`
+        : `<a href="lesson.html#/lesson/${vKey.split("-")[1]}" class="btn-nav" style="text-decoration:none;">📖 К уроку</a>`}
       <a href="index.html" class="btn-nav" style="text-decoration:none;">📚 Ко всем урокам</a>
     </div>`;
   slidesContainer.appendChild(resultsSlide);
@@ -677,6 +848,8 @@ function loadVariant(vKey) {
   $$("svg[data-geo]:not([data-geo=\"\"])", slidesContainer).forEach(attachGeoDrag);
 
   appState.slides = slides;
+  if (appState.mock) MockTimer.start(data.minutes || 90);
+  else MockTimer.hide();
   updateNav();
 }
 
@@ -698,12 +871,19 @@ function updateNav() {
       nextBtn.textContent = cur === total - 2 ? "К итогам 🏁" : "Далее ▶";
     }
   }
-  if (checkBtn) checkBtn.style.display = isLast ? "none" : "inline-block";
+  if (checkBtn) {
+    checkBtn.style.display = isLast ? "none" : "inline-block";
+    checkBtn.textContent = appState.mock && !appState.finished ? "Завершить пробник 🏁" : "Проверить ответ ✏️";
+  }
   if (counter) counter.textContent = `${cur + 1} / ${total}`;
 }
 
 function goToSlide(index) {
   if (index < 0 || index >= appState.slides.length) return;
+  if (appState.mock && !appState.finished && index === appState.slides.length - 1) {
+    finishMock(false); // к итогам пробника — только через завершение
+    return;
+  }
   appState.slides.forEach((s, idx) => s.classList.toggle("active", idx === index));
   appState.currentSlide = index;
   if (index === appState.slides.length - 1) calculateResults();
@@ -724,7 +904,19 @@ function displayAnswer(inp) {
  * @returns {boolean} все ли ответы верны
  */
 function checkCurrentSlide() {
-  const slideEl = appState.slides[appState.currentSlide];
+  if (appState.mock && !appState.finished) {
+    finishMock(false); // в пробнике ответы проверяются только в конце
+    return false;
+  }
+  return checkSlide(appState.slides[appState.currentSlide]);
+}
+
+/**
+ * Проверка одного слайда (используется уроками и итоговой проверкой пробника).
+ * @param {HTMLElement} slideEl
+ * @returns {boolean}
+ */
+function checkSlide(slideEl) {
   if (!slideEl) return false;
   let allCorrect = true;
   let firstOk = 0;
@@ -757,7 +949,7 @@ function checkCurrentSlide() {
     }
   });
 
-  Stats.recordChecks(appState.variantKey, firstOk, firstBad);
+  if (!appState.mock) Stats.recordChecks(appState.variantKey, firstOk, firstBad);
   return allCorrect;
 }
 
@@ -808,27 +1000,29 @@ function calculateResults() {
   else if (percent >= CONFIG.gradeScale[4]) { grade = 4; gradeText = "4 (Хорошо) 👍"; gradeClass = "grade-4"; }
   else if (percent >= CONFIG.gradeScale[3]) { grade = 3; gradeText = "3 (Удовлетворительно) ✍️"; gradeClass = "grade-3"; }
 
-  const timeSec = Math.round((new Date() - appState.startTime) / 1000);
   const vData = TASKS[appState.variantKey];
+  let timeSec = Math.round((new Date() - appState.startTime) / 1000);
+  if (vData.mock) timeSec = Math.min(timeSec, (vData.minutes || 90) * 60);
 
   appState.results = {
     variantKey: appState.variantKey,
-    title: `${vData.title} (${variantLabel(appState.variantKey)})`,
+    title: vData.mock ? `${vData.title} (${vData.minutes || 90} мин)${appState.timeUp ? " — время вышло" : ""}` : `${vData.title} (${variantLabel(appState.variantKey)})`,
     topic: vData.topic,
     totalScore, maxScore, percent, grade, gradeText, timeSec,
     reviewItems,
-    mistakes: reviewItems.filter((i) => !i.isOk).map(({ qNum, qTitle, userVal, correctVal }) => ({ qNum, qTitle, userVal, correctVal })),
+    mistakes: reviewItems.filter((i) => !i.isOk).map(({ qNum, qTitle, userVal, correctVal }) => ({ qNum, qTitle: fracPlain(qTitle), userVal: fracPlain(userVal), correctVal: fracPlain(correctVal) })),
     date: new Date().toLocaleString("ru-RU"),
   };
 
   if (!appState.recorded) {
     appState.recorded = true;
     const { reviewItems: _omit, ...toStore } = appState.results;
-    Stats.recordAttempt(appState.variantKey, { ...toStore, studentName: appState.studentName });
+    if (vData.mock) MockStats.record(appState.variantKey, { ...toStore, studentName: appState.studentName, timeUp: appState.timeUp });
+    else Stats.recordAttempt(appState.variantKey, { ...toStore, studentName: appState.studentName });
   }
 
   $("#scoreDisplay").textContent = `${totalScore} / ${maxScore} баллов`;
-  $("#percentDisplay").textContent = `${percent}% выполнено · ⏱ ${formatMMSS(timeSec)}`;
+  $("#percentDisplay").textContent = `${percent}% выполнено · ⏱ ${formatMMSS(timeSec)}${appState.timeUp ? " · время вышло" : ""}`;
   const gradeDisp = $("#gradeDisplay");
   gradeDisp.textContent = `Оценка: ${gradeText}`;
   gradeDisp.className = `grade-badge ${gradeClass}`;
@@ -887,12 +1081,13 @@ function setupEvents() {
   const checkBtn = $("#btnCheck");
   if (prevBtn) prevBtn.addEventListener("click", () => goToSlide(appState.currentSlide - 1));
   if (nextBtn) nextBtn.addEventListener("click", () => goToSlide(appState.currentSlide + 1));
-  if (checkBtn) checkBtn.addEventListener("click", checkCurrentSlide);
+  if (checkBtn) checkBtn.addEventListener("click", () => checkCurrentSlide());
 
   document.addEventListener("keydown", (e) => {
     const inModal = !!$(".modal-overlay.open");
     if (inModal) return;
     if (e.target.classList && e.target.classList.contains("math-input") && e.key === "Enter") {
+      if (appState.mock && !appState.finished) return;
       checkCurrentSlide();
       return;
     }
@@ -926,6 +1121,7 @@ function renderStatsPage() {
     const na = +a.split("-")[1], nb = +b.split("-")[1];
     return na - nb || a.localeCompare(b);
   });
+  renderMockStats();
   if (!keys.length) {
     $("#statsTable").innerHTML = `<div class="hint-box"><span>💡</span><div>Пока нет данных. Откройте любой урок, решите задания и нажмите «Проверить ответ ✏️».</div></div>`;
     return;
@@ -947,6 +1143,32 @@ function renderStatsPage() {
   $("#statsTable").innerHTML = html;
 }
 
+/** Таблица результатов пробников на странице статистики (отдельное хранилище). */
+function renderMockStats() {
+  let box = $("#statsMocks");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "statsMocks";
+    $("#statsTable").after(box);
+  }
+  const d = MockStats.load();
+  const mocks = LESSONS_DATA.mocks || [];
+  let html = `<h3 style="margin:24px 0 12px; color:var(--chalk);">★ Пробники (90 минут) — хранятся отдельно от уроков:</h3>`;
+  html += `<div class="table-scroll"><table class="review-table"><thead><tr>
+    <th>Пробник</th><th>Название</th><th>Попыток</th><th>Лучший</th><th>Последний</th><th>Время</th></tr></thead><tbody>`;
+  mocks.forEach((m) => {
+    const k = `P-${m.num}`;
+    const e = d[k];
+    const last = e && e.last ? `${e.last.totalScore}/${e.last.maxScore} (${e.last.percent}%)` : "—";
+    const time = e && e.last ? formatMMSS(e.last.timeSec) + (e.last.timeUp ? " ⌛" : "") : "—";
+    html += `<tr>
+      <td><a href="trainer.html?variant=${k}" style="color:var(--chalk); font-weight:bold;">П-${m.num}</a></td>
+      <td>${esc(m.title)}</td><td>${e ? e.attempts : 0}</td><td>${e ? e.best + "%" : "—"}</td><td>${last}</td><td>${time}</td></tr>`;
+  });
+  html += `</tbody></table></div>`;
+  box.innerHTML = html;
+}
+
 function statsNewSession() {
   Stats.newSession();
   renderStatsPage();
@@ -955,6 +1177,7 @@ function statsNewSession() {
 function statsResetAll() {
   if (!confirm("Сбросить всю статистику на этом устройстве?")) return;
   Stats.resetAll();
+  MockStats.reset();
   renderStatsPage();
 }
 

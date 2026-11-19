@@ -799,7 +799,7 @@ body {
 .frac {
   display: inline-flex;
   flex-direction: column;
-  vertical-align: -0.6em;
+  vertical-align: middle; /* черта дроби на уровне знаков «+ − = ·» — дроби не «съезжают» */
   text-align: center;
   padding: 0 0.22em;
   font-size: 0.95em;
@@ -1056,3 +1056,37 @@ body {
 @media (max-width: 640px) {
   .stats-link-text { display: none; }
 }
+
+/* Источник / обоснование задачи (Аничков — год или тип; Михлин) */
+.task-src {
+  font-size: 12.5px;
+  color: #8a7a5a;
+  margin: -4px 0 8px;
+  font-style: italic;
+}
+
+/* Пробники: описание на карточке, таймер, зафиксированные ответы */
+.mock-desc {
+  font-size: 13px;
+  color: #6b5a3e;
+  margin-top: 6px;
+  line-height: 1.45;
+}
+.mock-timer {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 6px 12px;
+  background: var(--sticky);
+  border: 1px solid var(--sticky-border);
+  border-radius: var(--radius-md);
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+  color: var(--chalk-dark);
+  box-shadow: var(--shadow-card);
+}
+.mock-timer.warn {
+  background: var(--bad-light);
+  border-color: var(--bad);
+  color: var(--bad);
+}
+.mock-finished svg[data-geo] { pointer-events: none; }

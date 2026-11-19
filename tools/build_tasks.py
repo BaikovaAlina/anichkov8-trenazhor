@@ -31,6 +31,15 @@ for key, v in tasks.items():
             for i in t["inputs"]:
                 if i.get("type") == "choice" and i["a"] not in i.get("options", []):
                     errors.append(f"{key} зад.{q['num']}: ответ «{i['a']}» не входит в options")
+for m in lessons.get("mocks", []):
+    v = tasks.get(f"P-{m['num']}")
+    if not v or not v.get("mock") or not v.get("minutes"):
+        errors.append(f"пробник П-{m['num']}: нет варианта P-{m['num']} с mock/minutes")
+for key, v in tasks.items():
+    for q in v["questions"]:
+        for t in q["tasks"]:
+            if not t.get("src"):
+                errors.append(f"{key} зад.{q['num']}: нет обоснования src")
 if errors:
     print("ОШИБКИ В БАНКЕ ЗАДАЧ:\n  " + "\n  ".join(errors))
     sys.exit(1)
@@ -41,7 +50,7 @@ header = (
     " * TASKS.JS — БАНК ЗАДАЧ (СГЕНЕРИРОВАН АВТОМАТИЧЕСКИ, НЕ РЕДАКТИРУЙТЕ)\n"
     " * Источник: data/lessons.json + data/tasks.json → python3 tools/build_tasks.py\n"
     f" * Модулей: {len(lessons['modules'])}, уроков: {len(lessons['lessons'])}, "
-    f"вариантов: {len(tasks)}, заданий: {rows}\n"
+    f"вариантов: {len(tasks)}, пробников: {len(lessons.get('mocks', []))}, заданий: {rows}\n"
     " * ============================================================ */\n"
 )
 body = (

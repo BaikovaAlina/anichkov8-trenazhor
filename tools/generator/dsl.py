@@ -3,13 +3,22 @@
 from fractions import Fraction as F
 import re
 
-LESSONS, MODULES, TASKS = [], [], {}
+LESSONS, MODULES, TASKS, MOCKS = [], [], {}, []
 CHECKS = []  # (key, label, answer, value) для самопроверки
 
 
 def fr(num, den):
-    """Вертикальная дробь (готовый HTML, formatMath его не трогает)."""
-    return f'<span class="frac"><span class="num">{num}</span><span class="den">{den}</span></span>'
+    """Дробь в единой разметке \\frac{num}{den} (рендерит formatMath на сайте)."""
+    return "\\frac{" + num + "}{" + den + "}"
+
+
+def _meta(row, src, tp):
+    """src — источник/обоснование задачи, tp — тема для аудита (если отличается от темы урока)."""
+    if src:
+        row["src"] = src
+    if tp:
+        row["tp"] = tp
+    return row
 
 
 def _num(s):
@@ -24,7 +33,7 @@ def _num(s):
     return F(s)
 
 
-def R(label, ans, e="", pre="Ответ:", type="", chk=None, fig=None, post=None):
+def R(label, ans, e="", pre="Ответ:", type="", chk=None, fig=None, post=None, src=None, tp=None):
     """Строка с одним полем ввода."""
     parts = [pre, {"_input": 0}] if pre else [{"_input": 0}]
     if post:
@@ -34,10 +43,10 @@ def R(label, ans, e="", pre="Ответ:", type="", chk=None, fig=None, post=Non
         row["fig"] = fig
     if chk is not None:
         CHECKS.append((label, ans, chk))
-    return row
+    return _meta(row, src, tp)
 
 
-def M(label, parts, answers, e="", types=None, fig=None, chks=None):
+def M(label, parts, answers, e="", types=None, fig=None, chks=None, src=None, tp=None):
     """Строка с несколькими полями: parts — список строк и None (места полей)."""
     out, k = [], 0
     for p in parts:
@@ -56,21 +65,21 @@ def M(label, parts, answers, e="", types=None, fig=None, chks=None):
         for a, c in zip(answers, chks):
             if c is not None:
                 CHECKS.append((label, a, c))
-    return row
+    return _meta(row, src, tp)
 
 
-def C(label, options, ans, e="", pre=None):
+def C(label, options, ans, e="", pre=None, src=None, tp=None):
     """Выбор одного варианта."""
     assert ans in options, (label, ans)
     parts = ([pre] if pre else []) + [{"_input": 0}]
-    return {"label": label, "parts": parts,
-            "inputs": [{"a": ans, "type": "choice", "options": options}], "e": e}
+    return _meta({"label": label, "parts": parts,
+            "inputs": [{"a": ans, "type": "choice", "options": options}], "e": e}, src, tp)
 
 
-def P(label, grid, ans, e=""):
+def P(label, grid, ans, e="", src=None, tp=None):
     """Перетаскивание точки по клетчатому чертежу (ответ — узел сетки)."""
-    return {"label": label, "parts": [{"_input": 0}],
-            "inputs": [{"a": ans, "type": "point", "grid": grid}], "e": e}
+    return _meta({"label": label, "parts": [{"_input": 0}],
+            "inputs": [{"a": ans, "type": "point", "grid": grid}], "e": e}, src, tp)
 
 
 def Q(title, sub, hints, rows, crumb=None):
@@ -78,26 +87,53 @@ def Q(title, sub, hints, rows, crumb=None):
             "rows": rows, "crumb": crumb}
 
 
+def _mkq(num, kind, qi, q):
+    """Готовый вопрос варианта: проставляет группы g (одна строка = один балл)."""
+    for ri, r in enumerate(q["rows"]):
+        for inp in r["inputs"]:
+            inp["g"] = f"q{qi}r{ri}"
+            inp["w"] = 1
+    return {"num": str(qi), "title": q["title"], "sub": q["sub"],
+            "crumb": q["crumb"] or (f"Урок {num} · {'Классная' if kind == 'K' else 'ДЗ'}" if kind in "KD" else ""),
+            "hints": q["hints"], "tasks": list(q["rows"])}
+
+
 def lesson(num, module, level, badge, title, short, theory, K, D):
     LESSONS.append({"num": num, "module": module, "level": level, "badge": badge,
                     "title": title, "short": short, "theory": theory})
     for kind, (topic, qs) in (("K", K), ("D", D)):
-        key = f"{kind}-{num}"
         work = "Классная работа" if kind == "K" else "Домашнее задание"
-        questions = []
-        for qi, q in enumerate(qs, 1):
-            tasks = []
-            for ri, r in enumerate(q["rows"]):
-                for inp in r["inputs"]:
-                    inp["g"] = f"q{qi}r{ri}"
-                    inp["w"] = 1
-                tasks.append(r)
-            questions.append({
-                "num": str(qi), "title": q["title"], "sub": q["sub"],
-                "crumb": q["crumb"] or f"Урок {num} · {'Классная' if kind == 'K' else 'ДЗ'}",
-                "hints": q["hints"], "tasks": tasks})
-        TASKS[key] = {"title": f"Урок {num} · {work}", "topic": topic, "badge": badge,
-                      "questions": questions}
+        TASKS[f"{kind}-{num}"] = {"title": f"Урок {num} · {work}", "topic": topic, "badge": badge,
+                                 "questions": [_mkq(num, kind, qi, q) for qi, q in enumerate(qs, 1)]}
+
+
+def extend(num, kind, qs):
+    """Добавить вопросы в конец существующего варианта K-num / D-num."""
+    v = TASKS[f"{kind}-{num}"]["questions"]
+    for q in qs:
+        v.append(_mkq(num, kind, len(v) + 1, q))
+
+
+def replace_q(num, kind, qi, q):
+    """Заменить вопрос №qi (с 1) варианта целиком (задачи, не прошедшие фильтр)."""
+    TASKS[f"{kind}-{num}"]["questions"][qi - 1] = _mkq(num, kind, qi, q)
+
+
+def replace_row(num, kind, qi, ri, row):
+    """Заменить строку ri (с 1) в вопросе qi."""
+    q = TASKS[f"{kind}-{num}"]["questions"][qi - 1]
+    for inp in row["inputs"]:
+        inp["g"] = f"q{qi}r{ri - 1}"
+        inp["w"] = 1
+    q["tasks"][ri - 1] = row
+
+
+def mock(num, title, desc, topics, qs, minutes=90):
+    """Комплексный пробник в формате первого тура Аничкова лицея (вариант P-num)."""
+    TASKS[f"P-{num}"] = {"title": f"Пробник {num}", "topic": title, "badge": f"Математика + логика · {minutes} мин",
+                         "mock": True, "minutes": minutes,
+                         "questions": [_mkq(num, "P", qi, q) for qi, q in enumerate(qs, 1)]}
+    MOCKS.append({"num": num, "title": title, "desc": desc, "topics": topics, "minutes": minutes})
 
 
 def module(num, title, section):

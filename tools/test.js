@@ -50,7 +50,56 @@ for (const [key, v] of Object.entries(TASKS)) {
   }
 }
 ok(rows >= 100, `заданий ${rows} < 100`);
-ok(LD.lessons.length === Object.keys(TASKS).length / 2, "у каждого урока есть K и D");
+LD.lessons.forEach((l, i) => {
+  ok(l.num === i + 1, `уроки пронумерованы подряд (урок ${l.num} на позиции ${i + 1})`);
+  ok(TASKS[`K-${l.num}`] && TASKS[`D-${l.num}`], `у урока ${l.num} есть K и D`);
+  const n = ["K", "D"].reduce((s, k) => s + TASKS[`${k}-${l.num}`].questions.reduce((a, q) => a + q.tasks.length, 0), 0);
+  ok(n >= 15, `урок ${l.num}: задач ${n} < 15`);
+});
+
+// ---- 5. Обоснование (src) у каждой задачи ----
+for (const [key, v] of Object.entries(TASKS))
+  for (const q of v.questions) q.tasks.forEach((t, ri) =>
+    ok(typeof t.src === "string" && /Аничков|Михлин/.test(t.src), `${key} №${q.num}.${ri + 1}: нет обоснования src`));
+
+// ---- 6. Пробники ----
+const mocks = LD.mocks || [];
+ok(mocks.length >= 3, `пробников ${mocks.length} < 3`);
+mocks.forEach((m) => {
+  const v = TASKS[`P-${m.num}`];
+  ok(v && v.mock === true && v.minutes === 90 && m.minutes === 90, `П-${m.num}: mock/minutes=90`);
+  const n = v ? v.questions.reduce((a, q) => a + q.tasks.length, 0) : 0;
+  ok(n >= 8 && n <= 16, `П-${m.num}: задач ${n}`);
+  ok(v && v.questions.length >= 8 && v.questions.length <= 12, `П-${m.num}: заданий ${v && v.questions.length} (нужно 8–12)`);
+  ok(Array.isArray(m.topics) && m.topics.length >= 6, `П-${m.num}: темы`);
+});
+const pKeys = Object.keys(TASKS).filter((k) => k.startsWith("P-"));
+ok(pKeys.length === mocks.length, "каждый P-вариант описан в LESSONS_DATA.mocks");
+const sets = pKeys.map((k) => TASKS[k].questions.flatMap((q) => q.tasks.map((t) => t.label)).join("\n"));
+ok(new Set(sets).size === sets.length, "наборы задач пробников различны");
+
+// ---- 7. Разметка дробей: баланс скобок и рендер ----
+const appSrc = fs.readFileSync(path.join(root, "js/app.js"), "utf8");
+const pick = (name) => appSrc.slice(appSrc.indexOf(`function ${name}(`), appSrc.indexOf("\n}\n", appSrc.indexOf(`function ${name}(`)) + 3);
+const fctx = {};
+vm.createContext(fctx);
+vm.runInContext(["fracHtml", "readBraceGroup", "renderFracMarkup", "fracPlain", "formatMath"].map(pick).join("\n") + ";this.formatMath=formatMath;this.fracPlain=fracPlain;", fctx);
+ok(fctx.formatMath("\\frac{1}{2}") === '<span class="frac"><span class="num">1</span><span class="den">2</span></span>', "formatMath: \\frac{1}{2}");
+ok((fctx.formatMath("\\frac{\\frac{1}{2} + 1}{3}").match(/class="frac"/g) || []).length === 2, "formatMath: вложенная дробь");
+ok(fctx.formatMath("15 км/ч и 3/4") === '15 км/ч и <span class="frac"><span class="num">3</span><span class="den">4</span></span>', "formatMath: единицы не трогаем, ответ 3/4 — дробь");
+ok(fctx.fracPlain("2\\frac{1}{3} и \\frac{x + 1}{x − 1}") === "2 1/3 и (x + 1)/(x − 1)", "fracPlain: " + fctx.fracPlain("2\\frac{1}{3} и \\frac{x + 1}{x − 1}"));
+const allStr = JSON.stringify([TASKS, LD]);
+let bal = 0, bad = 0;
+for (const m of allStr.matchAll(/\\\\frac\{/g)) {
+  let d = 0, j = m.index + 6, groups = 0;
+  for (; j < allStr.length && groups < 2; j++) {
+    if (allStr[j] === "{") d++;
+    else if (allStr[j] === "}" && --d === 0) { groups++; if (groups < 2 && allStr[j + 1] !== "{") break; }
+  }
+  if (groups === 2) bal++; else bad++;
+}
+ok(bad === 0, `\\frac без двух групп {…}{…}: ${bad}`);
+console.log(`Дробей в разметке \\frac: ${bal}; пробников: ${mocks.length}`);
 console.log(`Модулей: ${LD.modules.length}, уроков: ${LD.lessons.length}, вариантов: ${Object.keys(TASKS).length}, заданий: ${rows}, полей ответа: ${inputs}`);
 console.log(`Тестов пройдено: ${pass}, провалено: ${fail}`);
 process.exit(fail ? 1 : 0);
